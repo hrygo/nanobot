@@ -38,12 +38,22 @@ class GeminiProvider(LLMProvider):
         self.default_model = default_model
         self.timeout = timeout
 
-        # Initialize client - api_key is required for Gemini Developer API
+        # Initialize client with support for custom base_url
+        # api_key is required for Gemini Developer API
         # If api_key is None, SDK will try to use GOOGLE_GENAI_API_KEY env var
+        client_kwargs: dict[str, Any] = {}
+
         if api_key:
-            self.client = genai.Client(api_key=api_key)
-        else:
-            self.client = genai.Client()
+            client_kwargs["api_key"] = api_key
+
+        # Configure http_options - always set timeout
+        # Note: Gemini SDK uses http_options.base_url for custom endpoints
+        http_options_kwargs = {"timeout": timeout}
+        if api_base:
+            http_options_kwargs["base_url"] = api_base
+        client_kwargs["http_options"] = types.HttpOptions(**http_options_kwargs)
+
+        self.client = genai.Client(**client_kwargs)
 
     async def chat(
         self,

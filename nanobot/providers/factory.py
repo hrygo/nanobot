@@ -72,7 +72,6 @@ def create_provider(config: Config) -> LLMProvider:
         ProviderConfigError: If required API key is missing.
     """
     model = config.agents.defaults.model
-    api_base = config.get_api_base()
 
     # Detect provider type from model prefix
     provider_type, clean_model = _parse_model_name(model)
@@ -81,6 +80,7 @@ def create_provider(config: Config) -> LLMProvider:
         # Use native SDK
         provider_class = NATIVE_SDK_PROVIDERS[provider_type]
         provider_key = _get_provider_key(config, provider_type)
+        provider_api_base = _get_provider_base(config, provider_type)
 
         if not provider_key:
             raise ProviderConfigError(
@@ -90,13 +90,14 @@ def create_provider(config: Config) -> LLMProvider:
 
         return provider_class(
             api_key=provider_key,
-            api_base=api_base,
+            api_base=provider_api_base,
             default_model=clean_model,
             timeout=DEFAULT_TIMEOUT,
         )
 
     # Default: OpenAI-compatible protocol
     provider_key = config.get_api_key()
+    api_base = config.get_api_base()
 
     if not provider_key and not _is_local_model(model, api_base):
         raise ProviderConfigError(
@@ -154,6 +155,28 @@ def _get_provider_key(config: Config, provider_type: str) -> str | None:
     provider = getattr(config, provider_type, None)
     if provider and hasattr(provider, "api_key"):
         return provider.api_key or None
+    return None
+
+
+def _get_provider_base(config: Config, provider_type: str) -> str | None:
+    """
+    Get API base URL for a specific native provider from config.
+
+    Args:
+        config: The nanobot configuration.
+        provider_type: Provider type ("anthropic" or "gemini").
+
+    Returns:
+        API base URL if configured, None otherwise.
+    """
+    # Validate provider_type against known providers
+    if provider_type not in NATIVE_SDK_PROVIDERS:
+        return None
+
+    # Safely get provider config
+    provider = getattr(config, provider_type, None)
+    if provider and hasattr(provider, "api_base"):
+        return provider.api_base or None
     return None
 
 
